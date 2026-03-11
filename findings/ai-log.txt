@@ -1,0 +1,32 @@
+AI Usage Log for INFO5995 Assignment 1
+==========================================
+
+Discovery and Analysis Workflow
+-------------------------------
+1. Initial Research:
+   - Used AI to identify the correct decompilation tools (jadx, apktool).
+   - Used AI to understand the structure of the APK and identify the package name and main activities from AndroidManifest.xml.
+
+2. Static Analysis:
+   - Used AI (Gemini CLI) to search for security-sensitive keywords (random, crypto, token) across the decompiled source code.
+   - Identified Login.java's generateSessionToken() method as a potential vulnerability.
+
+3. Vulnerability Verification:
+   - Used AI to analyze the generateSessionToken() method and confirm the use of java.util.Random for session token generation.
+   - Created a Proof-of-Concept (POC) Java script (SessionTokenPOC.java) to demonstrate the predictability of java.util.Random when the seed is known.
+
+4. Threat Modeling:
+   - Developed a system and threat model with AI assistance, identifying assets (credentials, session tokens), attackers (local/network), and attack scenarios (token prediction).
+
+5. Report Preparation:
+   - Used AI to draft the LaTeX report following the USENIX conference paper template.
+   - Refined the explanation of the vulnerability, risk, and mitigation strategies.
+
+Tools and References
+--------------------
+- jadx (v1.5.5): Decompilation and source code retrieval. https://github.com/skylot/jadx
+- unzip: Initial APK structure inspection.
+- java.util.Random documentation: https://developer.android.com/reference/java/util/Random
+- java.security.SecureRandom documentation: https://developer.android.com/reference/java/security/SecureRandom
+- USENIX LaTeX Template: https://www.usenix.org/conferences/author-resources/paper-templates
+- MASTG (Mobile Application Security Testing Guide) for reference on session management and randomness vulnerabilities.
