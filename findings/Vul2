@@ -1,0 +1,30 @@
+## A refined version would be updated or merged into the appropriate destination
+
+## Vulnerability 2: Weak Session Token Generation (CRITICAL)
+
+### Location
+- **Class**: `com.example.mastg_test0016.Login`
+- **Method**: `generateSessionToken()`
+
+### Technical Details
+Session tokens are generated using the same weak random number generator:
+
+```java
+public String generateSessionToken() {
+    Random random = new Random();
+    int tokenValue = random.nextInt(999999);
+    return String.valueOf(tokenValue);
+}
+```
+
+### Security Impact
+- **Token Predictability**: Session tokens are 6-digit numbers (000000-999999) generated with predictable randomness
+- **Brute Force Feasibility**: Only 1 million possible tokens
+- **Session Hijacking**: Attackers can predict valid session tokens
+
+### Attacker Impact
+- Complete session hijacking capability
+- User account takeover
+- Persistent access to authenticated sessions
+
+---
