@@ -1,0 +1,9 @@
+Methods Used Summary (AI-Assisted)
+----------------------------------
+- Static decompilation with jadx and apktool
+- Targeted search for credential handling, session tokens, and storage APIs
+- Manifest review for exported components and backup settings
+- Dependency version extraction from META-INF/*.version
+- Advisory checks on official AndroidX and Kotlin coroutines security pages
+
+No dynamic testing was performed due to lack of device/emulator.

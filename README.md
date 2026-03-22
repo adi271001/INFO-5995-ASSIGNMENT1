@@ -16,11 +16,6 @@ The core finding is weak randomness in `com.example.mastg_test0016.Login.generat
 
 Static analysis found one other `Random` use in `MainActivity.randomNumberGenerator()`, but that method is not referenced elsewhere and does not protect a security-sensitive asset.
 
-## Files Updated
-
-- `findings/report.tex`: rewritten to align with the assignment rubric and the verified code path.
-- `findings/ai-log.txt`: expanded with evidence, validation steps, and a rubric-driven mock Q&A summary.
-- `findings/SessionTokenPOC.java`: replaced with a reproducible recovery demo based on the app's token-generation logic.
 
 ## Run the POC
 

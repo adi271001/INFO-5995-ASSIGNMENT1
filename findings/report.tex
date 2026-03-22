@@ -1,93 +1,74 @@
 \documentclass[letterpaper,twocolumn,10pt]{article}
 \usepackage{usenix2019_v3}
 \usepackage{microtype}
-\usepackage{tikz}
 \usepackage{listings}
-\usetikzlibrary{arrows.meta,calc,positioning}
 \microtypecontext{spacing=nonfrench}
 
 \lstset{
-basicstyle=\ttfamily\scriptsize,
-breaklines=true,
-breakatwhitespace=true,
-frame=single,
-columns=fullflexible,
-keepspaces=true
+  basicstyle=\ttfamily\scriptsize,
+  breaklines=true,
+  breakatwhitespace=true,
+  frame=single,
+  columns=fullflexible,
+  keepspaces=true
 }
 
 \begin{document}
 \date{}
-\title{\Large \bf AI-Assisted Discovery of Weak Session Token Randomness in an Android APK}
+\title{\Large \bf AI-Assisted Security Review of an Android APK: Credential Storage and Session Token Weaknesses}
 \author{{\rm Group Submission}\\INFO5995 Assignment 1}
 \maketitle
 
 \begin{abstract}
-We decompiled and reviewed the Android APK \texttt{a1\_case1 (1).apk} to identify security-sensitive uses of random-looking values. The main finding is that the login flow creates a 16-character session token with \texttt{java.util.Random}, which is unsuitable for authentication or session material. The report aligns its claims with verified evidence from the decompiled code, including the important limitation that the shipped sample stores the token but does not validate it before opening the profile screen.
+We reviewed the Android APK \texttt{a1\_case1.apk} and its decompiled source trees (JADX and APKTool) to identify critical or high-risk vulnerabilities. Two issues were confirmed in the shipped APK: (1) plaintext credential storage in internal files and (2) predictable session tokens generated with \texttt{java.util.Random} and stored unencrypted. We also performed a dependency version review against official advisory sources and found no published security advisories for the included libraries.
 \end{abstract}
 
 \section{Introduction}
-An Android application package (APK) is the installable bundle for an Android app, including code, resources, and the manifest. Because only the APK was provided, decompilation was required to inspect behavior, storage, and security-relevant design choices. We used \texttt{jadx}~\cite{jadx} to recover the manifest and Java source, then focused on values that looked random, token-like, or authentication-related.
+Only a compiled APK and decompiled artifacts were provided, so analysis relied on static inspection using \texttt{jadx}~\cite{jadx} and APKTool. We focused on credential handling, token generation, storage, and manifest exposure. Findings were verified against both decompiled trees and the original APK where possible.
 
 \section{System and Threat Model}
-The app has three core activities. \texttt{MainActivity} collects a username and password and stores them in app-private storage as \texttt{credentials.txt}. \texttt{Login} reads that file, checks the supplied credentials, and on success writes a 16-character \texttt{sessionToken} to \texttt{SharedPreferences} under \texttt{SessionPrefs}. \texttt{Profile} provides a logout button that removes the stored token.
+The app has three activities: \texttt{MainActivity} collects credentials and writes them to \texttt{credentials.txt}. \texttt{Login} reads the file, verifies the username and password, then generates a 16-character \texttt{sessionToken} and stores it in \texttt{SharedPreferences}. \texttt{Profile} clears the token on logout.
 
-\begin{figure}[t]
-\centering
-\begin{tikzpicture}[
->=Latex,
-node distance=4mm and 6mm,
-box/.style={draw, rounded corners, align=center, font=\scriptsize, minimum width=1.75cm, minimum height=0.7cm},
-asset/.style={draw, dashed, rounded corners, align=center, font=\scriptsize, minimum width=2.05cm, minimum height=0.7cm}
-]
-\node[box] (main) {MainActivity};
-\node[box, below=of main] (login) {Login};
-\node[box, below=of login] (profile) {Profile};
-\node[asset, right=of main] (cred) {credentials.txt\\username, password};
-\node[asset, right=of login] (sess) {SessionPrefs\\sessionToken};
-\draw[->] (main) -- node[left, font=\scriptsize]{launch} (login);
-\draw[->] (login) -- node[left, font=\scriptsize]{success} (profile);
-\draw[->] (main) -- node[above, font=\scriptsize]{write} (cred);
-\draw[->] (login) -- node[above, font=\scriptsize]{read/write} (sess);
-\draw[->, dashed] ($(login.west)+(-0.1,0)$) -- ++(-1.0,0)
-  node[left, align=right, font=\scriptsize]{attacker observes\\login timing};
-\end{tikzpicture}
-\caption{Simple system model showing app components, protected assets, and the session flow affected by weak randomness.}
-\end{figure}
+We consider a local attacker with access to app-private storage (e.g., rooted device, compromised device, or forensic extraction). We do not assume a remote attacker can directly read private files without local access. This aligns with standard mobile threat guidance that treats local extraction as a realistic capability for high-value targets and malware analysts~\cite{masvs}.
 
-The protected assets are the username/password pair and the session token. The relevant attacker is a local analyst or instrumented test environment that can decompile the APK, observe when a login occurs, and model or recover the state of a weak PRNG used for session material. We do not assume direct access to app-private files by another normal app, and we explicitly note that the current \texttt{Profile} activity does not enforce the token before rendering.
+\section{Finding 1: Plaintext Credential Storage}
+\textbf{Severity: Critical.}
+\texttt{MainActivity} writes the user-provided username and password directly into \texttt{credentials.txt} using \texttt{openFileOutput}, and \texttt{Login} reads that file and compares the raw strings. This enables full account compromise if local storage is extracted.
 
-\section{How the Finding Was Discovered}
-Static analysis located two uses of \texttt{java.util.Random}. The first, \texttt{MainActivity.randomNumberGenerator()}, returns \texttt{nextInt(100)} and is not referenced elsewhere, so it has no security role. The second appears in \texttt{Login.generateSessionToken()}, which is called by \texttt{createSession()} immediately after successful authentication. The decompiled token-generation excerpt is shown below.
+\begin{lstlisting}[language=Java,caption={Decompiled logic showing plaintext credential write.}]
+openFileOutput("credentials.txt", MODE_PRIVATE)
+    .write(("Username: " + user + " Password: " + pass + "\n").getBytes());
+\end{lstlisting}
 
-\begin{lstlisting}[language=Java,caption={Excerpt from the decompiled \texttt{Login} class showing \texttt{Random}-based token generation.}]
+\textbf{Impact.} Any attacker who can access the app's private files can recover credentials and reuse them elsewhere.
+
+\textbf{Fix.} Never store plaintext passwords. Store a salted, iterated hash (e.g., PBKDF2) in encrypted storage.
+
+\section{Finding 2: Predictable Session Tokens and Unencrypted Storage}
+\textbf{Severity: High (Critical if tokens gate access).}
+\texttt{Login.generateSessionToken()} uses \texttt{java.util.Random} to generate a 16-character token and stores it unencrypted in \texttt{SharedPreferences}.
+
+\begin{lstlisting}[language=Java,caption={Decompiled token generation using \texttt{Random}.}]
 Random random = new Random();
 for (int i = 0; i < 16; i++) {
     sb.append(ALPHABET.charAt(random.nextInt(62)));
 }
 \end{lstlisting}
 
-AI assistance was used to select tooling and suggest targeted searches such as \texttt{random}, \texttt{token}, and \texttt{session}. However, each claim in the final report was validated against the decompiled source because that review was necessary to avoid overstating the exploit path.
+\textbf{Impact.} \texttt{Random} is deterministic and not suitable for session material~\cite{randomdoc}. With enough observation, tokens can be predicted or recovered. If a future version relied on this token for authorization, this would allow session hijacking.
 
-\section{Vulnerability and Attack Scenario}
-\texttt{java.util.Random}~\cite{randomdoc} is a deterministic general-purpose PRNG, not a cryptographically secure random number generator. A value named \texttt{sessionToken} is therefore generated with the wrong primitive for its security role. If an attacker can bound the generator state closely enough, the same token sequence can be reproduced offline. Our proof of concept reuses the APK's token-generation loop and, for reproducibility, injects a fixed seed so that token recovery from a small candidate window can be demonstrated end to end.
+\textbf{Fix.} Use \texttt{SecureRandom} for token generation and store tokens in encrypted preferences.
 
-A plausible attack path, if the token were later relied on outside this sample UI, is:
-\begin{enumerate}
-\item Observe when a login event occurs or otherwise obtain enough information to constrain the PRNG state.
-\item Reimplement the token-generation loop from \texttt{Login.generateSessionToken()}.
-\item Enumerate candidate PRNG states in the feasible window until the generated token matches the observed or target token.
-\item Reuse that token anywhere the application or a future backend trusts it as proof of an authenticated session.
-\end{enumerate}
+\section{Dependency Review}
+Library versions extracted from the APK include \texttt{androidx.core:core 1.9.0}, \texttt{androidx.fragment:fragment 1.3.6}, \texttt{appcompat 1.6.1}, \texttt{material 1.11.0}, and \texttt{kotlinx-coroutines 1.6.4}. We checked official AndroidX release notes and the Kotlin coroutines security page and found no published security advisories for these artifacts at the time of review~\cite{androidx,kotlinsec}. This does not guarantee absence of risk; it simply reflects publicly listed advisories.
 
-One important limitation is that the shipped sample never checks \texttt{sessionToken} before launching \texttt{Profile}; the activity is also marked \texttt{android:exported="false"}. For that reason, we do not claim a complete end-to-end bypass against this APK alone. The demonstrated defect is narrower but still real: the app creates session material with a predictable, non-cryptographic generator.
-
-\section{Fix and Mitigation}
-The direct fix is to replace \texttt{java.util.Random} with \texttt{java.security.SecureRandom}~\cite{securedoc}, for example by instantiating a single \texttt{SecureRandom} and drawing token characters from it. \texttt{SecureRandom} is designed for security-sensitive tokens and resists practical state prediction far better than \texttt{Random}. A complete fix should also align the rest of the session design with that change: if the token is intended to protect access, protected screens or server endpoints must actually validate it instead of merely storing it on the client.
+\section{Mitigations Applied (Source Tree)}
+A patched source tree was created in the JADX directory that replaces plaintext credential storage with salted PBKDF2 hashes stored in \texttt{EncryptedSharedPreferences}, and replaces \texttt{Random}-based session tokens with \texttt{SecureRandom}~\cite{encprefs,masterkey,securedoc}. These changes are present in \texttt{SecurityUtils.java} within the decompiled source directory. The shipped APK does \emph{not} include these fixes and must be rebuilt from a proper source project to remediate.
 
 \section{Conclusion}
-Decompilation, targeted static analysis, and AI-assisted review identified the intended cryptographic weakness in this APK: a session token generated with \texttt{java.util.Random}. The final report aligns with the assignment requirements by presenting a clear system model, a concrete code-level finding, an evidence-based threat model, and a technically sound mitigation.
+Two critical/high-risk issues were confirmed in the APK: plaintext credential storage and predictable session tokens. Both can be addressed with standard cryptographic storage and secure randomness. No additional critical issues were found in static analysis, and no published library advisories were identified for the dependencies used.
 
-\begin{thebibliography}{9}
+\begin{thebibliography}{20}
 \small
 \bibitem{jadx}
 Skylot. \textit{jadx}. \url{https://github.com/skylot/jadx}
@@ -97,6 +78,45 @@ Android Developers. \textit{java.util.Random}. \url{https://developer.android.co
 
 \bibitem{securedoc}
 Android Developers. \textit{java.security.SecureRandom}. \url{https://developer.android.com/reference/java/security/SecureRandom}
+
+\bibitem{contextopen}
+Android Developers. \textit{Context.openFileOutput}. \url{https://developer.android.com/reference/android/content/Context#openFileOutput(java.lang.String,%20int)}
+
+\bibitem{sharedprefs}
+Android Developers. \textit{SharedPreferences}. \url{https://developer.android.com/reference/android/content/SharedPreferences}
+
+\bibitem{encprefs}
+Android Developers. \textit{EncryptedSharedPreferences}. \url{https://developer.android.com/reference/androidx/security/crypto/EncryptedSharedPreferences}
+
+\bibitem{masterkey}
+Android Developers. \textit{MasterKey}. \url{https://developer.android.com/reference/androidx/security/crypto/MasterKey}
+
+\bibitem{pbkdf2}
+OWASP. \textit{Password Storage Cheat Sheet}. \url{https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html}
+
+\bibitem{masvs}
+OWASP. \textit{Mobile Application Security Verification Standard (MASVS)}. \url{https://mas.owasp.org/MASVS/}
+
+\bibitem{androidmanifest}
+Android Developers. \textit{App Manifest}. \url{https://developer.android.com/guide/topics/manifest/manifest-intro}
+
+\bibitem{backup}
+Android Developers. \textit{Backup and Restore}. \url{https://developer.android.com/guide/topics/data/backup}
+
+\bibitem{keystore}
+Android Developers. \textit{Android Keystore System}. \url{https://developer.android.com/privacy-and-security/keystore}
+
+\bibitem{securitycrypto}
+Android Developers. \textit{Security Crypto Library}. \url{https://developer.android.com/topic/security/data}
+
+\bibitem{appsec}
+Android Developers. \textit{Security Best Practices}. \url{https://developer.android.com/privacy-and-security/security-best-practices}
+
+\bibitem{androidx}
+Android Developers. \textit{AndroidX Releases}. \url{https://developer.android.com/jetpack/androidx/releases}
+
+\bibitem{kotlinsec}
+Kotlin. \textit{kotlinx.coroutines Security Advisories}. \url{https://github.com/Kotlin/kotlinx.coroutines/security}
 \end{thebibliography}
 
 \end{document}

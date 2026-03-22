@@ -3,17 +3,33 @@
 \providecommand\HyField@AuxAddToFields[1]{}
 \providecommand\HyField@AuxAddToCoFields[2]{}
 \citation{jadx}
+\citation{masvs}
 \citation{randomdoc}
+\citation{androidx,kotlinsec}
 \@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {2}System and Threat Model}{1}{section.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Simple system model showing app components, protected assets, and the session flow affected by weak randomness.}}{1}{figure.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3}How the Finding Was Discovered}{1}{section.3}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {1}Excerpt from the decompiled \texttt  {Login} class showing \texttt  {Random}-based token generation.}{1}{lstlisting.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4}Vulnerability and Attack Scenario}{1}{section.4}\protected@file@percent }
-\citation{securedoc}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Finding 1: Plaintext Credential Storage}{1}{section.3}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {1}Decompiled logic showing plaintext credential write.}{1}{lstlisting.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4}Finding 2: Predictable Session Tokens and Unencrypted Storage}{1}{section.4}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {2}Decompiled token generation using \texttt  {Random}.}{1}{lstlisting.2}\protected@file@percent }
+\citation{encprefs,masterkey,securedoc}
 \bibcite{jadx}{1}
 \bibcite{randomdoc}{2}
 \bibcite{securedoc}{3}
-\@writefile{toc}{\contentsline {section}{\numberline {5}Fix and Mitigation}{2}{section.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6}Conclusion}{2}{section.6}\protected@file@percent }
+\bibcite{contextopen}{4}
+\bibcite{sharedprefs}{5}
+\bibcite{encprefs}{6}
+\bibcite{masterkey}{7}
+\bibcite{pbkdf2}{8}
+\bibcite{masvs}{9}
+\bibcite{androidmanifest}{10}
+\bibcite{backup}{11}
+\bibcite{keystore}{12}
+\bibcite{securitycrypto}{13}
+\bibcite{appsec}{14}
+\bibcite{androidx}{15}
+\bibcite{kotlinsec}{16}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Dependency Review}{2}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}Mitigations Applied (Source Tree)}{2}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Conclusion}{2}{section.7}\protected@file@percent }
 \gdef \@abspage@last{2}

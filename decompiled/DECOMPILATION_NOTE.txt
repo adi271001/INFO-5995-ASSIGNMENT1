@@ -1,0 +1,2 @@
+This directory contains decompiled artifacts from the original APK.
+It is intentionally left unchanged to preserve evidence used in the report.
