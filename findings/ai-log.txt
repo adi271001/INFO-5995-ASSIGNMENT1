@@ -1,0 +1,58 @@
+AI Usage Log for INFO5995 Assignment 1
+======================================
+
+Scope of AI Assistance
+----------------------
+1. Tool selection and workflow setup
+   - Confirmed use of `jadx` and `apktool` for decompilation and source recovery.
+   - Suggested targeted searches such as `credentials`, `sessionToken`, `Random`, and storage APIs.
+
+2. Static analysis support
+   - Traced credential handling in `MainActivity` and `Login`.
+   - Traced session-token generation and storage in `Login`, and token clearing in `Profile`.
+   - Reviewed manifest exposure and backup settings.
+
+3. Dependency review
+   - Extracted library versions from `META-INF/*.version`.
+   - Checked official advisory sources for AndroidX, Material Components, and Kotlin coroutines.
+
+4. Report refinement
+   - Drafted a concise report in the USENIX template within 2 pages.
+
+Evidence Collected
+------------------
+- `decompiled/sources/com/example/mastg_test0016/MainActivity.java`
+  - Stores credentials in `credentials.txt` with `openFileOutput()`.
+- `decompiled/sources/com/example/mastg_test0016/Login.java`
+  - Reads `credentials.txt` and validates credentials in plaintext.
+  - Generates `sessionToken` with `java.util.Random` and stores it in `SharedPreferences`.
+- `decompiled/sources/com/example/mastg_test0016/Profile.java`
+  - Clears `sessionToken` on logout.
+- `decompiled/resources/AndroidManifest.xml`
+  - `allowBackup="false"`, no exported activities except launcher.
+
+Rubric-Driven Mock Q&A (Required)
+--------------------------------
+Q: What is the protected asset and attacker capability?
+A: Protected assets are the username/password and `sessionToken`. The attacker is a local analyst (rooted or forensic access) who can read app-private files. This directly enables credential theft and session token recovery.
+
+Q: What is the exact vulnerability and where is it located?
+A: Plaintext credentials are written to `credentials.txt` in `MainActivity`. Session tokens are generated using `java.util.Random` in `Login.generateSessionToken()` and stored in `SharedPreferences` unencrypted.
+
+Q: Why is this security-relevant and how could it be exploited?
+A: Plaintext storage enables direct credential theft from extracted app data. `Random` is deterministic; tokens can be predicted if an attacker can bound the seed or observe timing. If tokens are later used for authorization, this enables session hijacking.
+
+Q: What is the concrete fix?
+A: Store only salted, iterated password hashes (PBKDF2) in encrypted storage; use `SecureRandom` for tokens and store them in encrypted preferences.
+
+References Checked
+------------------
+- AndroidX release notes and security advisories (official developer site).
+- Kotlin coroutines security advisories page on GitHub.
+- Material Components advisories (none published for the version used).
+
+References
+----------
+- jadx: https://github.com/skylot/jadx
+- AndroidX release notes: https://developer.android.com/jetpack/androidx/releases
+- Kotlin coroutines security advisories: https://github.com/Kotlin/kotlinx.coroutines/security
